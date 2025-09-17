@@ -1,0 +1,49 @@
+{
+  "cli": {
+    "version": ">= 3.22.0"
+  },
+  "build": {
+    "production": {
+      "ios": {
+        "autoIncrement": "version",
+        "simulator": false,
+        "image": "latest"
+      },
+      "android": {
+        "gradleCommand": ":app:bundleRelease"
+      },
+      "env": {
+        "EXPO_NO_TELEMETRY": "1"
+      }
+    },
+    "preview": {
+      "ios": {
+        "autoIncrement": "buildNumber",
+        "simulator": false
+      }
+    },
+    "simulator": {
+      "ios": {
+        "simulator": true
+      },
+      "env": {
+        "EXPO_NO_TELEMETRY": "1"
+      }
+    }
+  },
+  "submit": {
+    "production": {
+      "ios": {
+        "appleId": "${{APPLE_ID}}",
+        "ascAppId": "${{ASC_APP_ID}}",
+        "appleTeamId": "${{APPLE_TEAM_ID}}",
+        "language": "en-US",
+        "companyName": "${{COMPANY_NAME}}",
+        "sku": "${{SKU}}",
+        "submitToTestflight": true,
+        "withoutCredentials": false
+      }
+    }
+  }
+}
+

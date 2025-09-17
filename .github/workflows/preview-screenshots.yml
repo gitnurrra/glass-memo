@@ -1,0 +1,64 @@
+name: Preview Screenshots
+
+on:
+  workflow_dispatch: {}
+  push:
+    branches: [ main ]
+    paths-ignore:
+      - '*.json'
+      - '*.md'
+      - '*.txt'
+  pull_request:
+    branches: [ main ]
+    paths-ignore:
+      - '*.json'
+      - '*.md'
+      - '*.txt'
+
+jobs:
+  build-and-screenshot:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install dependencies
+        run: |
+          npm ci
+
+      - name: Install Playwright browsers
+        run: |
+          npx playwright install --with-deps chromium
+
+      - name: Build Expo web preview
+        run: |
+          npx expo export --platform web --output-dir dist
+
+      - name: Serve preview
+        run: |
+          npx http-server dist -p 8080 -a 127.0.0.1 &
+          echo "server_pid=$!" >> $GITHUB_ENV
+
+      - name: Capture screenshots
+        env:
+          PREVIEW_URL: http://127.0.0.1:8080
+        run: |
+          node scripts/capture-screenshots.mjs
+
+      - name: Upload screenshots artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: preview-screenshots
+          path: artifacts/screenshots
+
+      - name: Stop server
+        if: always()
+        run: |
+          if [ -n "$server_pid" ]; then kill $server_pid || true; fi
+
+

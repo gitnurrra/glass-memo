@@ -1,0 +1,71 @@
+name: iOS Build and TestFlight Submit
+
+on:
+  workflow_dispatch:
+    inputs:
+      profile:
+        description: EAS build profile
+        required: false
+        default: production
+  push:
+    tags:
+      - 'ios-v*'
+
+jobs:
+  build-and-submit-ios:
+    runs-on: macos-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install dependencies
+        run: |
+          npm i -g eas-cli
+          npm ci
+
+      - name: Authenticate with EAS
+        env:
+          EAS_TOKEN: ${{ secrets.EAS_TOKEN }}
+        run: |
+          eas whoami || true
+
+      - name: Configure Apple credentials (App Store Connect API)
+        if: ${{ secrets.ASC_API_KEY_ID && secrets.ASC_API_ISSUER_ID && secrets.ASC_API_KEY_BASE64 }}
+        run: |
+          mkdir -p ~/.appstoreconnect/private_keys
+          echo "${{ secrets.ASC_API_KEY_BASE64 }}" | base64 --decode > ~/.appstoreconnect/private_keys/AuthKey_${{ secrets.ASC_API_KEY_ID }}.p8
+
+      - name: EAS Build (iOS)
+        env:
+          EXPO_TOKEN: ${{ secrets.EAS_TOKEN }}
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+          ASC_APP_ID: ${{ secrets.ASC_APP_ID }}
+          COMPANY_NAME: ${{ secrets.COMPANY_NAME }}
+          SKU: ${{ secrets.SKU }}
+        run: |
+          eas build --platform ios --non-interactive --profile "${{ github.event.inputs.profile || 'production' }}" --no-wait
+
+      - name: Wait for EAS build to finish and download artifact
+        env:
+          EXPO_TOKEN: ${{ secrets.EAS_TOKEN }}
+        run: |
+          BUILD_ID=$(eas build:list --limit 1 --platform ios --status in-queue,in-progress,finished --json | node -e "(async()=>{const fs=require('fs');const d=JSON.parse(fs.readFileSync(0,'utf8'));console.log(d[0]?.id||'')})()")
+          echo "BUILD_ID=$BUILD_ID" >> $GITHUB_ENV
+          eas build:wait --build-id $BUILD_ID --non-interactive
+          eas build:download --build-id $BUILD_ID --platform ios --path ./artifacts
+
+      - name: Submit to TestFlight
+        if: ${{ success() }}
+        env:
+          EXPO_TOKEN: ${{ secrets.EAS_TOKEN }}
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+          ASC_APP_ID: ${{ secrets.ASC_APP_ID }}
+        run: |
+          eas submit --platform ios --profile production --non-interactive

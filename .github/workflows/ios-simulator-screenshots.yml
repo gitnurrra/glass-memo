@@ -1,0 +1,94 @@
+name: iOS Simulator Screenshots
+
+on:
+  workflow_dispatch:
+    inputs:
+      profile:
+        description: EAS build profile (simulator)
+        required: false
+        default: simulator
+
+jobs:
+  build-simulator-and-screenshot:
+    runs-on: macos-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install dependencies
+        run: |
+          npm i -g eas-cli
+          npm ci
+
+      - name: Authenticate with EAS
+        env:
+          EAS_TOKEN: ${{ secrets.EAS_TOKEN }}
+        run: |
+          eas whoami || true
+
+      - name: Build iOS simulator artifact
+        env:
+          EXPO_TOKEN: ${{ secrets.EAS_TOKEN }}
+        run: |
+          eas build --platform ios --profile "${{ github.event.inputs.profile || 'simulator' }}" --non-interactive --wait --json > build.json
+          cat build.json | jq -r '.[0].artifacts.buildUrl' > build_url.txt
+          BUILD_URL=$(cat build_url.txt)
+          echo "BUILD_URL=$BUILD_URL" >> $GITHUB_ENV
+
+      - name: Download simulator .app.tar.gz
+        run: |
+          curl -L "$BUILD_URL" -o app.tar.gz
+          mkdir -p sim_app && tar -xzf app.tar.gz -C sim_app
+          echo "Unpacked files:" && ls -la sim_app
+
+      - name: Find .app bundle path
+        id: find_app
+        run: |
+          APP_PATH=$(find sim_app -name '*.app' -maxdepth 3 | head -n 1)
+          if [ -z "$APP_PATH" ]; then echo "No .app found" && exit 1; fi
+          echo "app_path=$APP_PATH" >> $GITHUB_OUTPUT
+
+      - name: Boot iOS Simulator
+        id: boot
+        run: |
+          DEVICE_NAME="iPhone 15"
+          DEVICE_ID=$(xcrun simctl list devices available | grep "$DEVICE_NAME" | head -n1 | awk -F '[()]' '{print $2}')
+          if [ -z "$DEVICE_ID" ]; then
+            RUNTIME=$(xcrun simctl list runtimes | grep -i "iOS .* (.*)" | tail -n1 | awk -F '[()]' '{print $2}')
+            DEVICE_ID=$(xcrun simctl create "iPhone 15" com.apple.CoreSimulator.SimDeviceType.iPhone-15 "$RUNTIME")
+          fi
+          xcrun simctl boot "$DEVICE_ID" || true
+          echo "device_id=$DEVICE_ID" >> $GITHUB_OUTPUT
+          xcrun simctl bootstatus "$DEVICE_ID" -b
+
+      - name: Install and launch app
+        env:
+          DEVICE_ID: ${{ steps.boot.outputs.device_id }}
+        run: |
+          xcrun simctl install "$DEVICE_ID" "${{ steps.find_app.outputs.app_path }}"
+          # Read bundle identifier from Info.plist
+          BUNDLE_ID=$(defaults read "${{ steps.find_app.outputs.app_path }}/Info" CFBundleIdentifier)
+          echo "BUNDLE_ID=$BUNDLE_ID" >> $GITHUB_ENV
+          xcrun simctl launch "$DEVICE_ID" "$BUNDLE_ID" || true
+          # Allow app to settle
+          sleep 3
+
+      - name: Capture screenshots
+        env:
+          DEVICE_ID: ${{ steps.boot.outputs.device_id }}
+        run: |
+          mkdir -p artifacts/ios-screenshots
+          xcrun simctl io "$DEVICE_ID" screenshot artifacts/ios-screenshots/home.png
+
+      - name: Upload screenshots artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ios-simulator-screenshots
+          path: artifacts/ios-screenshots
+
+
