@@ -1,4 +1,4 @@
-# GlassMemo - Native Liquid Glass Implementation
+# GlassMemo - A Liquid Glass implementation
 
 A minimal floating notes app with true native iOS liquid glass effects using UIVisualEffectView and custom glass morphism.
 
