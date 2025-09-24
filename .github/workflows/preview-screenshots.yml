@@ -37,12 +37,15 @@ jobs:
           npx playwright install --with-deps chromium
 
       - name: Build Expo web preview
+        env:
+          EXPO_NO_TELEMETRY: '1'
+          CI: 'true'
         run: |
           npx expo export --platform web --output-dir dist
 
-      - name: Serve preview
+      - name: Serve preview (SPA)
         run: |
-          npx http-server dist -p 8080 -a 127.0.0.1 &
+          npx -y serve -s dist -l 8080 &
           echo "server_pid=$!" >> $GITHUB_ENV
 
       - name: Capture screenshots
@@ -61,5 +64,3 @@ jobs:
         if: always()
         run: |
           if [ -n "$server_pid" ]; then kill $server_pid || true; fi
-
-

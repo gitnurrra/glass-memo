@@ -37,6 +37,13 @@ async function capture() {
   for (const route of routes) {
     const url = new URL(route, baseUrl).toString();
     await page.goto(url, { waitUntil: 'networkidle' });
+    // Wait for app content to render (header text 'GlassMemo' exists in UI)
+    try {
+      await page.waitForFunction(() => document.body && document.body.innerText && document.body.innerText.includes('GlassMemo'), { timeout: 15000 });
+    } catch (_) {
+      // As a fallback, give it a moment to render even if text isn't found
+      await page.waitForTimeout(2000);
+    }
     // Small settle time for any animations
     await page.waitForTimeout(500);
     const safe = route === '/' ? 'home' : route.replace(/[^a-z0-9]+/gi, '-').replace(/^-|-$/g, '');

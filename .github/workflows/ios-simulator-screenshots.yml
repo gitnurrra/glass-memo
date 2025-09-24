@@ -23,6 +23,7 @@ jobs:
       - name: Install dependencies
         run: |
           npm i -g eas-cli
+          npm install
           npm ci
 
       - name: Authenticate with EAS
