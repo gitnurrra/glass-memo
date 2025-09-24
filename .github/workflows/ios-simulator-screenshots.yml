@@ -33,11 +33,13 @@ jobs:
 
       - name: Build iOS simulator artifact
         env:
-          EXPO_TOKEN: ${{ secrets.EAS_TOKEN }}
+          EAS_TOKEN: ${{ secrets.EAS_TOKEN }}
         run: |
           eas build --platform ios --profile "${{ github.event.inputs.profile || 'simulator' }}" --non-interactive --wait --json > build.json
-          cat build.json | jq -r '.[0].artifacts.buildUrl' > build_url.txt
+          # Parse build.json using node (avoids depending on jq installation)
+          node -e "const fs=require('fs');const j=JSON.parse(fs.readFileSync('build.json','utf8'));console.log((j[0] && j[0].artifacts && j[0].artifacts.buildUrl) || '');" > build_url.txt
           BUILD_URL=$(cat build_url.txt)
+          if [ -z "$BUILD_URL" ]; then echo "No BUILD_URL found in build.json" && cat build.json && exit 1; fi
           echo "BUILD_URL=$BUILD_URL" >> $GITHUB_ENV
 
       - name: Download simulator .app.tar.gz

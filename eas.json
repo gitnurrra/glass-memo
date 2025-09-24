@@ -39,9 +39,7 @@
         "appleTeamId": "${{APPLE_TEAM_ID}}",
         "language": "en-US",
         "companyName": "${{COMPANY_NAME}}",
-        "sku": "${{SKU}}",
-        "submitToTestflight": true,
-        "withoutCredentials": false
+        "sku": "${{SKU}}"
       }
     }
   }
