@@ -34,7 +34,7 @@ jobs:
 
       - name: Build iOS simulator artifact
         env:
-          EAS_TOKEN: ${{ secrets.EXPO_TOKEN }}
+          EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
         run: |
           eas build --platform ios --profile "${{ github.event.inputs.profile || 'simulator' }}" --non-interactive --wait --json > build.json
           # Parse build.json using node (avoids depending on jq installation)
